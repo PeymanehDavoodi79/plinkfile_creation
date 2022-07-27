@@ -6,7 +6,75 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+#plink format file
+
+rm(list=ls()) 
+
+#install.packages("tidyverse")
+library(tidyverse)
+data<- read.table("raw.txt", skip = 9, header=T, sep="\t")
+
+head (data)
+
+
+#long format file
+
+#fam file
+data %>%
+  distinct(IID)%>%
+  mutate(FID=1, Sire=0, Dam=0, Sex=0,  Phenotype=-9)%>%
+  relocate('IID', .after=FID)%>%
+  write_delim("NEW.fam", col_names=F)
+fam<-read.delim("NEW.fam", header=FALSE)
+
+head(fam)
+dim(fam)
+
+
+#Lgen file
+data%>%
+  mutate(FID =1)%>%
+  select(FID, IID, snp, allele1, allele2)%>%
+  write_delim("NEW.lgen", col_names = F)
+lgen<-read.delim("NEW.lgen", header = FALSE)
+head(lgen)
+
+#map file
+data %>%
+  distinct(snp, .keep_all=TRUE)%>%
+  mutate(distance=0)%>%
+  dplyr::select(chr, snp, distance, position)%>%
+  write_delim("NEW.map", col_names = F)
+map<-read.delim("NEW.map" ,header = FALSE)
+head(map)
+
+
+#change to ped file with plink
+
+#including family, sex and phenotype
+
+system("plink --dog --allow-extra-chr --nonfounders --allow-no-sex --lfile NEW  --missing-genotype - --output-missing-genotype 0 --recode --out data")
+
+
+
+
+#############Update to new assembly##################
+map<-read.delim("data.map" ,header = FALSE)
+
+
+head(map)
+map %>%
+  dplyr::select(V1, V2)%>%
+  write_delim("NEWupdate.txt", col_names = F)
+
+
+
+system("plink --file data --chr-set 28 --allow-extra-chr --update-chr data.map 1 2
+       --update-map data.map 4 2 --make-bed  --out updated")
+
+
+system("plink --dog --allow-extra-chr --nonfounders --allow-no-sex --chr 1-28 --bfile updated  --make-bed --recode --out GWAS")
+
 ```
 
 ## R Markdown
